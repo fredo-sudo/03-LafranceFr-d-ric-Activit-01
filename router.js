@@ -1,4 +1,100 @@
 const utilities = require('./utilities');
+const Response = require("./response");
+const TokenManager = require('./tokenManager');
+
+// this function extract the JSON data from the body of the request
+// and and pass it to controller Method
+// if an error occurs it will send an error response
+function processJSONBody(req, res, controller, methodName) {
+    let response = new Response(res);
+    let body = [];
+    req.on('data', chunk => {
+        body.push(chunk);
+    }).on('end', () => {
+        try {
+            // we assume that the data is in JSON format
+            if (req.headers['content-type'] === "application/json") {
+                controller[methodName](JSON.parse(body));
+            }
+            else 
+                response.unsupported();
+        } catch(error){
+            console.log(error);
+            response.unprocessable();
+        }
+    });
+}
+
+exports.dispatch_TOKEN_EndPoint = function(req, res){
+    let response = new Response(res);
+    let url = utilities.removeQueryString(req.url);
+    if (url =='/token'){
+        try{
+            // dynamically import the targeted controller
+            // if the controller does not exist the catch section will be called
+            const Controller = require('./controllers/AccountsController');
+            // instanciate the controller       
+            let controller =  new Controller(req, res);
+            if (req.method === 'POST')
+                processJSONBody(req, res, controller, 'login');
+            else {
+                response.notFound();
+            }
+            // request consumed
+            return true;
+
+        } catch(error){
+            // catch likely called because of missing controller class
+            // i.e. require('./' + controllerName) failed
+            // but also any unhandled error...
+            console.log('endpoint not found');
+            console.log(error);
+            response.notFound();
+            // request consumed
+            return true;
+        }
+    }
+    // request not consumed
+    // must be handled by another middleware
+    return false;
+}
+
+// {method, ControllerName, Action}
+const RouteRegister = require('./routeRegister');
+exports.dispatch_Registered_EndPoint = function(req, res){
+    let route = RouteRegister.find(req);
+    if (route != null) {
+        try{
+            // dynamically import the targeted controller
+            // if the controllerName does not exist the catch section will be called
+            const Controller = require('./controllers/' + route.modelName + "Controller");
+            // instanciate the controller       
+            let controller =  new Controller(req, res);
+            if (route.method === 'POST' || route.method === 'PUT')
+                processJSONBody(req, res, controller, route.actionName);
+            else {
+                controller[route.actionName](route.id);
+            }
+            // request consumed
+            return true;
+
+        } catch(error){
+            // catch likely called because of missing controller class
+            // i.e. require('./' + controllerName) failed
+            // but also any unhandled error...
+            console.log('endpoint not found');
+            console.log(error);
+            response.notFound();
+                // request consumed
+                return true;
+        }
+    }
+    // not an registered endpoint
+    // request not consumed
+    // must be handled by another middleware
+    return false;
+
+}
 
 //////////////////////////////////////////////////////////////////////
 // dispatch_API_EndPoint middleware
@@ -17,31 +113,7 @@ const utilities = require('./utilities');
 // RessourceNamesController that must inherit from Controller class
 /////////////////////////////////////////////////////////////////////
 exports.dispatch_API_EndPoint = function(req, res){
-
-    const Response = require("./response");
     let response = new Response(res);
-
-    // this function extract the JSON data from the body of the request
-    // and and pass it to controllerMethod
-    // if an error occurs it will send an error response
-    function processJSONBody(req, controller, methodName) {
-        let body = [];
-        req.on('data', chunk => {
-            body.push(chunk);
-        }).on('end', () => {
-            try {
-                // we assume that the data is in the JSON format
-                if (req.headers['content-type'] === "application/json") {
-                    controller[methodName](JSON.parse(body));
-                }
-                else 
-                    response.unsupported();
-            } catch(error){
-                console.log(error);
-                response.unprocessable();
-            }
-        });
-    }
 
     let controllerName = '';
     let id = undefined;
@@ -49,37 +121,21 @@ exports.dispatch_API_EndPoint = function(req, res){
     // this function check if url contain a valid API endpoint.
     // in the process, controllerName and optional id will be extracted
     function API_Endpoint_Ok(url){
-        // ignore the query string, it will be handled by the targeted controller
-        let queryStringMarkerPos = url.indexOf('?');
-        if (queryStringMarkerPos > -1)
-            url = url.substr(0, url.indexOf('?'));
+        let path = utilities.decomposePath(url);
         // by convention api endpoint start with /api/...
-        if (url.indexOf('/api/') > -1) {
-            // extract url componants, array from req.url.split("/") should 
-            // look like ['','api','{resource name}','{id}]'
-            let urlParts = url.split("/");
-            // do we have a resource name?
-            if (urlParts.length > 2) {
+        if (path.isAPI) {
+            if (path.model != undefined) {
                 // by convention controller name -> NameController
-                controllerName = utilities.capitalizeFirstLetter(urlParts[2]) + 'Controller';
+                controllerName = utilities.capitalizeFirstLetter(path.model) + 'Controller';
                 // do we have an id?
-                if (urlParts.length > 3){
-                    if (urlParts[3] !== '') {
-                        id = parseInt(urlParts[3]);
-                        if (isNaN(id)) { 
-                            response.badRequest();
-                            // bad id
-                            return false;
-                        } else
-                        // we have a valid id
-                        return true;
-
-                    } else
-                     // it is ok to have no id
-                     return true;
-                } else
-                    // it is ok to have no id
-                    return true;
+                if (path.id != undefined)
+                    if (isNaN(path.id)) {
+                        response.badRequest();
+                        // bad id
+                        return false;
+                    }
+                id = path.id;
+                return true;
             }
         }
         // bad API endpoint
@@ -103,24 +159,40 @@ exports.dispatch_API_EndPoint = function(req, res){
             // instanciate the controller       
             let controller =  new Controller(req, res);
 
-            // to do : find methods that contain the http verb
+            // verify if controller need authorization
+            // if so, validate the extracted token from header
+            if (controller.authorize){
+                if (req.headers["authorization"] != undefined) {
+                    let token = req.headers["authorization"].replace('Bearer ','');
+                    if (TokenManager.find(token) == null) {
+                        console.log('unauthorized access!');
+                        response.unAuthorized();
+                        return true;
+                    }
+                } else {
+                    console.log('unauthorized access!');
+                    response.unAuthorized();
+                    return true;
+                }
+            }
+            
             if (req.method === 'GET') {
                 controller.get(id);
                 // request consumed
                 return true;
             }
             if (req.method === 'POST'){
-                processJSONBody(req, controller,"post");
+                processJSONBody(req, res, controller,"post");
                 // request consumed
                 return true;
             }
             if (req.method === 'PUT'){
-                processJSONBody(req, controller,"put");
+                processJSONBody(req, res, controller,"put");
                 // request consumed
                 return true;
             }
             if (req.method === 'PATCH'){
-                processJSONBody(req, controller,"patch");
+                processJSONBody(req, res, controller,"patch");
                 // request consumed
                 return true;
             }

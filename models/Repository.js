@@ -78,6 +78,7 @@ class Repository {
     }
     update(objectToModify) {
         let index = 0;
+        console.log(objectToModify)
         for(let object of this.objectsList){
             if (object.Id === objectToModify.Id) {
                 this.objectsList[index] = objectToModify;
@@ -87,5 +88,19 @@ class Repository {
             index ++;
         }
         return false;
+    } 
+    findByField(fieldName, value){
+        let index = 0;
+        for(let object of this.objectsList){
+            try {
+                if (object[fieldName] === value) {
+                    return this.objectsList[index];
+                }
+                index ++;
+            } catch(error) {
+                break;
+            }
+        }
+        return null;
     }
 }

@@ -1,4 +1,5 @@
 const Response = require('../response.js');
+const utilities = require('../utilities');
 const queryString = require('query-string');
 /////////////////////////////////////////////////////////////////////
 // Important note about controllers:
@@ -9,20 +10,21 @@ const queryString = require('query-string');
 /////////////////////////////////////////////////////////////////////
 module.exports = 
 class Controller {
-    constructor(req, res) {
+    constructor(req, res, authorize = false) {
         this.req = req;
         this.res = res;
+        // if true, will require a valid bearer token from request header
+        this.authorize = authorize;
         this.response = new Response(res);
     }
     getQueryStringParams(){
-        let url = this.req.url;
-        if (url.indexOf('?') > -1) {
-            url = url.substring(url.indexOf('?'),url.length);
-            const parsed = queryString.parse(url);
-            return parsed;
+        let path = utilities.decomposePath(this.req.url);
+        if (path.queryString != undefined) {
+            return queryString.parse(path.queryString);
         }
         return null;
     }
+    queryStringParamsList() { return "";}
     get(id){
         this.response.notImplemented();
     }  
