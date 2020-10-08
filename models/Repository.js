@@ -1,5 +1,7 @@
 
+const { timeStamp } = require('console');
 const fs = require('fs');
+const { list } = require('../endpoints');
 ///////////////////////////////////////////////////////////////////////////
 // This class provide CRUD operations on JSON objects collection text file 
 // with the assumption that each object have an Id member.
@@ -56,13 +58,52 @@ class Repository {
     getAll() {
         return this.objectsList;
     }
-    get(id){
+    getAllOption(){
+        return JSON.stringify(" les services disponible sont : localhost:5000/api/bookmarks? + " +
+        "sort=name, sort=category, /id, name=nomBookmark, name=préfixeNom* ou category=bookmarksAvecCetteCat ");
+    }
+    getByAscendingOrder(sortValue) {
+        if(sortValue == "name")
+            return this.objectsList.sort((a, b) => (a.Name > b.Name) ? 1 : -1);
+        else if(sortValue == "category")
+            return this.objectsList.sort((a, b) => ( a.Category > b.Category) ? 1 : -1);
+        else
+            return null;
+    }
+    getById(id){
         for(let object of this.objectsList){
             if (object.Id === id) {
                return object;
             }
         }
         return null;
+    }
+    getByName(name){
+        for(let object of this.objectsList){
+            if (object.Name === name) {
+               return object;
+            }
+        }
+        return null;
+    }
+    getByNameLike(Name) {
+        let listNameLike = [];
+        for(let object of this.objectsList){
+            let valNom = object.Name;
+            if (valNom.includes(Name)) {
+               listNameLike.push(object);
+            }
+        }
+        return listNameLike;
+    }
+    getByCategory(Category){
+        let listCategory = [];
+        for(let object of this.objectsList){
+            if (object.Category == Category) {
+               listCategory.push(object);
+            }
+        }
+        return listCategory;
     }
     remove(id) {
         let index = 0;

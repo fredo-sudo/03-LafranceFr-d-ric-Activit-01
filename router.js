@@ -1,4 +1,7 @@
 const utilities = require('./utilities');
+const queryString = require("query-string");
+const url = require('url');
+const BookmarksController = require('./controllers/bookmarksController');
 
 //////////////////////////////////////////////////////////////////////
 // dispatch_API_EndPoint middleware
@@ -16,7 +19,7 @@ const utilities = require('./utilities');
 // For ressource name RessourName you have to name the controller
 // RessourceNamesController that must inherit from Controller class
 /////////////////////////////////////////////////////////////////////
-exports.dispatch_API_EndPoint = function(req, res){
+exports.dispatch_API_EndPoint = function (req, res) {
 
     const Response = require("./response");
     let response = new Response(res);
@@ -34,9 +37,9 @@ exports.dispatch_API_EndPoint = function(req, res){
                 if (req.headers['content-type'] === "application/json") {
                     controller[methodName](JSON.parse(body));
                 }
-                else 
+                else
                     response.unsupported();
-            } catch(error){
+            } catch (error) {
                 console.log(error);
                 response.unprocessable();
             }
@@ -48,7 +51,7 @@ exports.dispatch_API_EndPoint = function(req, res){
 
     // this function check if url contain a valid API endpoint.
     // in the process, controllerName and optional id will be extracted
-    function API_Endpoint_Ok(url){
+    function API_Endpoint_Ok(url) {
         // ignore the query string, it will be handled by the targeted controller
         let queryStringMarkerPos = url.indexOf('?');
         if (queryStringMarkerPos > -1)
@@ -63,20 +66,20 @@ exports.dispatch_API_EndPoint = function(req, res){
                 // by convention controller name -> NameController
                 controllerName = utilities.capitalizeFirstLetter(urlParts[2]) + 'Controller';
                 // do we have an id?
-                if (urlParts.length > 3){
+                if (urlParts.length > 3) {
                     if (urlParts[3] !== '') {
                         id = parseInt(urlParts[3]);
-                        if (isNaN(id)) { 
+                        if (isNaN(id)) {
                             response.badRequest();
                             // bad id
                             return false;
                         } else
-                        // we have a valid id
-                        return true;
+                            // we have a valid id
+                            return true;
 
                     } else
-                     // it is ok to have no id
-                     return true;
+                        // it is ok to have no id
+                        return true;
                 } else
                     // it is ok to have no id
                     return true;
@@ -85,8 +88,8 @@ exports.dispatch_API_EndPoint = function(req, res){
         // bad API endpoint
         return false;
     }
-   
-    if (req.url == "/api"){
+
+    if (req.url == "/api") {
         const endpoints = require('./endpoints');
         endpoints.list(res);
         return true;
@@ -96,51 +99,94 @@ exports.dispatch_API_EndPoint = function(req, res){
         // in the following, we will call the corresponding method of the controller class accordingly  
         // by using the Http verb of the request.
         // for the POST and PUT verb, will we have to extract the data from the body of the request
-        try{
+        try {
             // dynamically import the targeted controller
             // if the controllerName does not exist the catch section will be called
             const Controller = require('./controllers/' + controllerName);
             // instanciate the controller       
-            let controller =  new Controller(req, res);
+            let controller = new Controller(req, res);
+
+            let string = req.url.split("bookmarks")[1];
+            let param = queryString.parse(string);
+
+            var queryObject = url.parse(req.url, true).query;
+            var nbParam = Object.keys(queryObject).length;
+
+            console.log(param.category)
 
             // to do : find methods that contain the http verb
-            if (req.method === 'GET') {
-                controller.get(id);
-                // request consumed
-                return true;
+            if (nbParam <= 3) {
+                if (req.method === 'GET') {
+                    if (nbParam >= 1) {
+                        if (param.sort != "" && param.sort != undefined) {
+                            let sortValue = param.sort.replace('"', '').replace('"', '');
+                            controller.getBookmarksByAscendingOrder(sortValue);
+                        }
+                        else if (param.name != "" && param.name != undefined) {
+                            let name = param.name.replace('"', '').replace('"', '');
+                            if (param.name.includes("*")) {
+                                let newName = name.replace('*', '')
+                                controller.getBookmarkByNameLike(newName)
+                            } else {
+                                controller.getBookmarkByName(name)
+                            }
+                        }
+                        else if (param.category != "" && param.category != undefined) {
+                            let cat = param.category.replace('"', '').replace('"', '');
+                            controller.getBookmarkByCategory(cat)
+                        }
+                    }
+                    else if (nbParam == 0) {
+                        if (string.includes("/")) {
+                            controller.getBookmarkById(id)
+                        }
+                        else if (req.url.split("bookmarks")[1] == "?") {
+                            controller.getAllOption();
+                        }
+                        else {
+                            controller.getAll();
+                        }
+                    }
+
+                    // request consumed
+                    return true;
+
+                }
+                if (req.method === 'POST') {
+                    processJSONBody(req, controller, "post");
+                    // request consumed
+                    return true;
+
+                }
+                if (req.method === 'PUT') {
+                    processJSONBody(req, controller, "put");
+                    // request consumed
+                    return true;
+
+                }
+                if (req.method === 'PATCH') {
+                    processJSONBody(req, controller, "patch");
+                    // request consumed
+                    return true;
+                }
+                if (req.method === 'DELETE') {
+                    if (!isNaN(id))
+                        controller.remove(id);
+                    else
+                        response.badRequest();
+                    // request consumed
+                    return true;
+                }
             }
-            if (req.method === 'POST'){
-                processJSONBody(req, controller,"post");
-                // request consumed
-                return true;
-            }
-            if (req.method === 'PUT'){
-                processJSONBody(req, controller,"put");
-                // request consumed
-                return true;
-            }
-            if (req.method === 'PATCH'){
-                processJSONBody(req, controller,"patch");
-                // request consumed
-                return true;
-            }
-            if (req.method === 'DELETE') {
-                if (!isNaN(id))
-                    controller.remove(id);
-                else 
-                    response.badRequest();
-                // request consumed
-                return true;
-            }
-        } catch(error){
+        } catch (error) {
             // catch likely called because of missing controller class
             // i.e. require('./' + controllerName) failed
             // but also any unhandled error...
             console.log('endpoint not found');
             console.log(error);
             response.notFound();
-                // request consumed
-                return true;
+            // request consumed
+            return true;
         }
     }
     // not an API endpoint
