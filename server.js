@@ -1,9 +1,14 @@
+//////////////////////////////////////////////////////////////////////////////
+// Uncomment to create and fill with data ./contacts.json file
+// let Contacts = require('./models/initContacts.js');
+// Contacts.initContacts(); 
+///////////////////////////////////////////////////////////////////////////////
+
 function ShowRequestInfo(req){
+    //const URL = require('url').URL;
+    //let url = new URL(req.url);
     console.log(`User agent:${req.headers["user-agent"]}`);
-    if (req.headers["content-type"] != undefined)
-        console.log(`Content-type:${req.headers["content-type"]}`);
-    if (req.headers["authorization"] != undefined)
-        console.log(`Authorisation:${req.headers["authorization"]}`);
+    console.log(`Content-type:${req.headers["content-type"]}`);
     console.log(`Method:${req.method}`);
     console.log(`Path:${req.url}`);
 }
@@ -31,30 +36,15 @@ function notFound(res) {
 function API_Endpoint(req, res) {
     return require('./router').dispatch_API_EndPoint(req, res);
 }
-function TOKEN_Endpoint(req, res) {
-    return require('./router').dispatch_TOKEN_EndPoint(req, res);
-}
-function registered_Enpoint(req, res) {
-    return require('./router').dispatch_Registered_EndPoint(req, res);
-}
-function routeConfig() {
-    const RouteRegister = require('./routeRegister');
-    RouteRegister.add('GET','accounts');
-    RouteRegister.add('POST','accounts','register');
-}
-const utilities = require('./utilities');
 const PORT = process.env.PORT || 5000;
-
-routeConfig();
 require('http').createServer((req, res) => {
     // Middlewares pipeline
     ShowRequestInfo(req);
-    console.log(utilities.decomposePath(req.url));
     AccessControlConfig(res);
-    if (!CORS_Prefligth(req, res))
-    if (!TOKEN_Endpoint(req, res))
-    if (!registered_Enpoint(req, res))
-    if (!API_Endpoint(req, res))
-    // do something else with request
-    notFound(res);
+    if (!CORS_Prefligth(req, res)) { 
+        if (!API_Endpoint(req, res)) {
+            // do something else with request
+            notFound(res);
+        }
+    }
 }).listen(PORT, () => console.log(`HTTP Server running on port ${PORT}...`));
