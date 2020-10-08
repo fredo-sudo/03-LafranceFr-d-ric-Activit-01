@@ -20,7 +20,7 @@ class ContactsController extends require('./Controller') {
         // todo : avoid duplicates
         let newContact = this.contactsRepository.add(contact);
         if (newContact)
-            this.response.created(newContact);
+            this.response.created(JnewContact);
         else
             this.response.internalError();
     }

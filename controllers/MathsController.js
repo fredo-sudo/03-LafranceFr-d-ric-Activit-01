@@ -117,10 +117,10 @@ class MathsController extends require('./Controller') {
         }
     }
 
-    queryStringParamsList() {
+    help() {
         // expose all the possible query strings
         let content = "<div style=font-family:arial>";
-        content += "<h4>List of possible parameters in query strings:</h4>";
+        content += "<h3>GET : api/maths endpoint  <br> List of possible query strings:</h3><hr>";
         content += "<h4>? op = + & x = number & y = number <br>return {\"op\":\"+\", \"x\":number, \"y\":number, \"value\": x + y} </h4>";
         content += "<h4>? op = - & x = number & y = number <br>return {\"op\":\"-\", \"x\":number, \"y\":number, \"value\": x - y} </h4>";
         content += "<h4>? op = * & x = number & y = number <br>return {\"op\":\"*\", \"x\":number, \"y\":number, \"value\": x * y} </h4>";
@@ -128,14 +128,9 @@ class MathsController extends require('./Controller') {
         content += "<h4>? op = % & x = number & y = number <br>return {\"op\":\"%\", \"x\":number, \"y\":number, \"value\": x % y} </h4>";
         content += "<h4>? op = ! & n = integer <br>return {\"op\":\"%\",\"n\":integer, \"value\": n!} </h4>";
         content += "<h4>? op = p & n = integer <br>return {\"op\":\"p\",\"n\":integer, \"value\": true if n is a prime number} </h4>";
-        content += "<h4>? op = n & n = integer <br>return {\"op\":\"n\",\"n\":integer, \"value\": nth prime number} </h4>"; 
-        content += "</div>"
-        return content;
-    }
-    queryStringHelp() {
-        
+        content += "<h4>? op = n & n = integer <br>return {\"op\":\"n\",\"n\":integer, \"value\": nth prime number} </h4>";
         this.res.writeHead(200, {'content-type':'text/html'});
-        this.res.end(this.queryStringParamsList());
+        this.res.end(content) + "</div>";
     }
     
     get(){
@@ -145,7 +140,7 @@ class MathsController extends require('./Controller') {
             this.response.badRequest();
         }
         if (Object.keys(params).length === 0) {
-           this.queryStringHelp();
+           this.help();
         } else {
             if (this.checkParams(params)) {
                 this.doOperation(params);

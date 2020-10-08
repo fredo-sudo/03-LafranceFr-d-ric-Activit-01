@@ -35,10 +35,6 @@ class Response {
         // forbidden status
         this.status(403);
     }
-    unAuthorized() {
-        // forbidden status
-        this.status(401);
-    }
     notAloud() {
         // Method not aloud status
         this.status(405);

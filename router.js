@@ -2,102 +2,6 @@ const utilities = require('./utilities');
 const queryString = require("query-string");
 const url = require('url');
 const BookmarksController = require('./controllers/bookmarksController');
-const Response = require("./response");
-const TokenManager = require('./tokenManager');
-
-// this function extract the JSON data from the body of the request
-// and and pass it to controller Method
-// if an error occurs it will send an error response
-function processJSONBody(req, res, controller, methodName) {
-    let response = new Response(res);
-    let body = [];
-    req.on('data', chunk => {
-        body.push(chunk);
-    }).on('end', () => {
-        try {
-            // we assume that the data is in JSON format
-            if (req.headers['content-type'] === "application/json") {
-                controller[methodName](JSON.parse(body));
-            }
-            else 
-                response.unsupported();
-        } catch(error){
-            console.log(error);
-            response.unprocessable();
-        }
-    });
-}
-
-exports.dispatch_TOKEN_EndPoint = function(req, res){
-    let response = new Response(res);
-    let url = utilities.removeQueryString(req.url);
-    if (url =='/token'){
-        try{
-            // dynamically import the targeted controller
-            // if the controller does not exist the catch section will be called
-            const Controller = require('./controllers/AccountsController');
-            // instanciate the controller       
-            let controller =  new Controller(req, res);
-            if (req.method === 'POST')
-                processJSONBody(req, res, controller, 'login');
-            else {
-                response.notFound();
-            }
-            // request consumed
-            return true;
-
-        } catch(error){
-            // catch likely called because of missing controller class
-            // i.e. require('./' + controllerName) failed
-            // but also any unhandled error...
-            console.log('endpoint not found');
-            console.log(error);
-            response.notFound();
-            // request consumed
-            return true;
-        }
-    }
-    // request not consumed
-    // must be handled by another middleware
-    return false;
-}
-
-// {method, ControllerName, Action}
-const RouteRegister = require('./routeRegister');
-exports.dispatch_Registered_EndPoint = function(req, res){
-    let route = RouteRegister.find(req);
-    if (route != null) {
-        try{
-            // dynamically import the targeted controller
-            // if the controllerName does not exist the catch section will be called
-            const Controller = require('./controllers/' + route.modelName + "Controller");
-            // instanciate the controller       
-            let controller =  new Controller(req, res);
-            if (route.method === 'POST' || route.method === 'PUT')
-                processJSONBody(req, res, controller, route.actionName);
-            else {
-                controller[route.actionName](route.id);
-            }
-            // request consumed
-            return true;
-
-        } catch(error){
-            // catch likely called because of missing controller class
-            // i.e. require('./' + controllerName) failed
-            // but also any unhandled error...
-            console.log('endpoint not found');
-            console.log(error);
-            response.notFound();
-                // request consumed
-                return true;
-        }
-    }
-    // not an registered endpoint
-    // request not consumed
-    // must be handled by another middleware
-    return false;
-
-}
 
 //////////////////////////////////////////////////////////////////////
 // dispatch_API_EndPoint middleware
@@ -153,10 +57,14 @@ exports.dispatch_API_EndPoint = function (req, res) {
         if (queryStringMarkerPos > -1)
             url = url.substr(0, url.indexOf('?'));
         // by convention api endpoint start with /api/...
-        if (path.isAPI) {
-            if (path.model != undefined) {
+        if (url.indexOf('/api/') > -1) {
+            // extract url componants, array from req.url.split("/") should 
+            // look like ['','api','{resource name}','{id}]'
+            let urlParts = url.split("/");
+            // do we have a resource name?
+            if (urlParts.length > 2) {
                 // by convention controller name -> NameController
-                controllerName = utilities.capitalizeFirstLetter(path.model) + 'Controller';
+                controllerName = utilities.capitalizeFirstLetter(urlParts[2]) + 'Controller';
                 // do we have an id?
                 if (urlParts.length > 3) {
                     if (urlParts[3] !== '') {

@@ -22,23 +22,14 @@ exports.list = (res) => {
         } catch (error) {
             // no model associated with controller
             // must be an endpoint working with query strings
+            resourceNamePluralized = resourceNamePluralized + "? return list of possible query strings";
         } 
         // if we have a get method, expose GET: /api/ModelsController and GET: /api/ModelsController/id endpoints
         if (methods.indexOf('get') > -1){
             endpoints += "<h4>GET : /api/" + resourceNamePluralized + "</h4>";
-        } else {
-            // this controller is not used for API services
-            // to do : find a better way for Web API controller filtering
-            return "";
-        }
-        // if we have a queryStringList method, expose list of params usage
-        if (methods.indexOf('queryStringParamsList') > -1){
-            try {
-                 endpoints += controller["queryStringParamsList"]();
-            } catch(error) { 
-                // to do
-                console.log(error);
-            };
+            // if we don't have an associated model expose only get endpoint
+            if (resclass != null)
+                endpoints += "<h4>GET : /api/" + resourceNamePluralized + "/id</h4>";
         }
         // if we have a post method, expose POST: /api/ModelsController endpoint
         if (methods.indexOf('post') > -1){
@@ -56,7 +47,7 @@ exports.list = (res) => {
     }
 
     let content = "<div style=font-family:arial>";
-    content += "<h1>WEB API ENDPOINTS</h1><hr>";
+    content += "<h1>CRUD DEMO ENDPOINTS</h1><hr>";
     const path = require('path');
     const fs = require('fs');
     // construct controller directoty path
